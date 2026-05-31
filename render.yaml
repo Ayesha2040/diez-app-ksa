@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: diez-classification
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false        # set this manually in the Render dashboard
+      - key: OPENAI_API_KEY
+        sync: false        # optional — only needed if not using Anthropic
+    healthCheckPath: /api/health
