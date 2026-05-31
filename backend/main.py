@@ -8,6 +8,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from pipeline import scan
 from frameworks import FRAMEWORKS
@@ -51,8 +52,14 @@ async def scan_batch(files: list[UploadFile] = File(...)):
 
 @app.get("/api/results")
 async def get_results():
-    """Return all stored scan results — used by frontend on load to restore state."""
-    return store.load()
+    """Return stored scan results, deduplicated by filename (newest wins)."""
+    results = store.load()
+    # Deduplicate: if the same filename appears multiple times (e.g. from
+    # different code versions with different ID schemes), keep only the last entry
+    seen: dict = {}
+    for r in results:
+        seen[r.get("name", r.get("id", ""))] = r
+    return list(seen.values())
 
 
 @app.get("/api/export")
@@ -113,18 +120,22 @@ async def get_review_queue():
     return queue
 
 
+class ResolveBody(BaseModel):
+    action: str = "auto-file"
+    note:   str = ""
+
 @app.post("/api/review-queue/{scan_id}/resolve")
-async def resolve_review(scan_id: str, body: dict = {}):
+async def resolve_review(scan_id: str, body: ResolveBody = ResolveBody()):
     """Mark a review-queue item as resolved with an outcome."""
     results = store.load()
     for r in results:
         if r.get("id") == scan_id:
-            r["action"]         = body.get("action", "auto-file")
-            r["reviewNote"]     = body.get("note", "")
+            r["action"]         = body.action
+            r["reviewNote"]     = body.note
             r["reviewResolved"] = True
             break
     store._save(results)
-    return {"status": "resolved", "id": scan_id}
+    return {"status": "resolved", "id": scan_id, "action": body.action}
 
 
 @app.post("/api/retention/{scan_id}/dispose")

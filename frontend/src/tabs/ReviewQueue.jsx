@@ -2,29 +2,30 @@ import { useState, useEffect } from 'react';
 import { API, SEV } from '../config';
 import { Pill, Card, MetricCard, ActionBadge } from '../components';
 
-export default function ReviewQueue({ fw, frameworks, docs }) {
-  const [items, setItems]     = useState([]);
+export default function ReviewQueue({ fw, frameworks, docs, onDocUpdate }) {
+  const [items, setItems]         = useState([]);
   const [resolving, setResolving] = useState(null);
 
   useEffect(() => {
     fetch(`${API}/review-queue`)
       .then(r => r.json())
       .then(data => setItems(Array.isArray(data) ? data : []))
-      .catch(() => {
-        // Fallback: filter from local docs
-        setItems(docs.filter(d => d.action === "human-review"));
-      });
+      .catch(() => setItems(docs.filter(d => d.action === "human-review")));
   }, [docs]);
 
   const handleResolve = async (id, action) => {
     setResolving(id);
     try {
-      await fetch(`${API}/review-queue/${id}/resolve`, {
+      const res = await fetch(`${API}/review-queue/${id}/resolve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      setItems(prev => prev.filter(it => it.id !== id));
+      if (res.ok) {
+        setItems(prev => prev.filter(it => it.id !== id));
+        // Propagate the new action back to App.jsx so DocScan badge updates
+        onDocUpdate?.(id, { action, reviewResolved: true });
+      }
     } catch (e) {
       console.error("Resolve failed", e);
     } finally {

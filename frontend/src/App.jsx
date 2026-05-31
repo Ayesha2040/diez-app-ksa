@@ -51,8 +51,20 @@ export default function App() {
 
   const handleScanResults = useCallback((results) => {
     const valid = results.filter(r => !r.error);
-    setScannedDocs(prev => [...prev, ...valid]);
-    if (valid.length > 0) setTab(2); // Jump to scan results
+    if (valid.length === 0) return;
+    setScannedDocs(prev => {
+      const existingIds = new Set(prev.map(d => d.id));
+      // Replace existing docs that were re-scanned, append genuinely new ones
+      const updated = prev.map(d => valid.find(v => v.id === d.id) || d);
+      const brandNew = valid.filter(v => !existingIds.has(v.id));
+      return [...updated, ...brandNew];
+    });
+    setTab(2);
+  }, []);
+
+  // Called by ReviewQueue when a human-review item is resolved
+  const handleDocUpdate = useCallback((id, patch) => {
+    setScannedDocs(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
   }, []);
 
   const handleSelectDoc = (idx) => { setSelectedIdx(idx); setTab(3); };
@@ -95,7 +107,7 @@ export default function App() {
       {tab === 3 && <DocDetail fw={fw} setFw={setFw} frameworks={frameworks} doc={scannedDocs[selectedIdx]} onBack={handleBack} />}
       {tab === 4 && <ExecSummary fw={fw} setFw={setFw} frameworks={frameworks} docs={scannedDocs} />}
       {tab === 5 && <Retention fw={fw} frameworks={frameworks} docs={scannedDocs} />}
-      {tab === 6 && <ReviewQueue fw={fw} frameworks={frameworks} docs={scannedDocs} />}
+      {tab === 6 && <ReviewQueue fw={fw} frameworks={frameworks} docs={scannedDocs} onDocUpdate={handleDocUpdate} />}
     </div>
   );
 }

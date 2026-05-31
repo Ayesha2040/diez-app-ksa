@@ -20,8 +20,11 @@ def load() -> list:
 
 def append(result: dict):
     results = load()
-    # Replace if same ID already stored (re-scan of same file)
-    results = [r for r in results if r.get("id") != result.get("id")]
+    scan_id = result.get("id", "")
+    name    = result.get("name", "")
+    # Replace any entry with the same ID or same filename — prevents duplicate rows
+    # when the same file is re-scanned (even if the content hash changed)
+    results = [r for r in results if r.get("id") != scan_id and r.get("name") != name]
     results.append(result)
     _save(results)
 
