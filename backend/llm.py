@@ -23,7 +23,9 @@ Your job is to explain WHY the verdict is what it is, and to provide actionable 
 
 Produce a single JSON object with these fields:
 
-1. "column_tiers": Object mapping each column name to an object with "tier" and "reason". Apply these rules exactly:
+1. "public_disclosure": Boolean — true ONLY if the document is clearly intended for public distribution (e.g. published bank fee schedule, public annual report, regulatory price list, public tender notice). False for anything internal, personal, or ambiguous. This is used to de-escalate entity-level financial data that is publicly disclosed, not to affect personal data classification.
+
+2. "column_tiers": Object mapping each column name to an object with "tier" and "reason". Apply these rules exactly:
 
    ALWAYS "sens" (KSA PDPL Art. 1 Sensitive categories — explicit list, do not expand):
    - Saudi National ID, Iqama number, passport number, biometric data, genetic data
@@ -42,11 +44,11 @@ Produce a single JSON object with these fields:
    Only include columns present in the input.
    Each reason should be 3-6 words referencing the applicable KSA law.
 
-2. "summary": 2-3 sentence plain-language explanation of what was found and why the tier is what it is. If a text excerpt was provided, reference specific content from it (e.g. document type, declared classification, purpose of data). Reference KSA PDPL / NDMO / SAMA / NCA where applicable.
+3. "summary": 2-3 sentence plain-language explanation of what was found and why the tier is what it is. If a text excerpt was provided, reference specific content from it (e.g. document type, declared classification, purpose of data). Reference KSA PDPL / NDMO / SAMA / NCA where applicable.
 
-3. "regulations": List of objects with "regulation", "relevance", "severity". Only include regulations that actually apply based on the signals detected. Choose from: KSA PDPL, NDMO, NCA DCC-1:2022, SAMA Cybersecurity Framework, KSA AML Law (Royal Decree M/20), KSA Labour Law (Royal Decree M/51), MOH Data Governance Policy, ZATCA, NCA ECC-1:2018.
+4. "regulations": List of objects with "regulation", "relevance", "severity". Only include regulations that actually apply based on the signals detected. Choose from: KSA PDPL, NDMO, NCA DCC-1:2022, SAMA Cybersecurity Framework, KSA AML Law (Royal Decree M/20), KSA Labour Law (Royal Decree M/51), MOH Data Governance Policy, ZATCA, NCA ECC-1:2018.
 
-4. "recommendations": List of 3-5 objects with "action" and "detail". Specific to KSA regulatory context and the detected signals.
+5. "recommendations": List of 3-5 objects with "action" and "detail". Specific to KSA regulatory context and the detected signals.
 
 Do NOT include a "tier" field — the tier is already decided.
 Respond ONLY with valid JSON. No markdown, no preamble, no backticks."""

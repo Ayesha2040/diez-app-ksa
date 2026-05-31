@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pill, SevDot, SrcIcon, DetTag, ConfBar, MetricCard, FwToggle, ActionBadge } from '../components';
 import { SEV, effectiveTier } from '../config';
 
-export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
+export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc, onClearAll }) {
   const [sortBy, setSortBy] = useState(null);
   const [sortDir, setSortDir] = useState('desc');
   const [filter, setFilter] = useState('all');
@@ -68,7 +68,14 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
           <div style={{ fontSize: 18, fontWeight: 500, color: "#2C2C2A" }}>Scan results — Client estate</div>
           <span style={{ background: "#EAF3DE", color: "#27500A", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500 }}>Scan complete</span>
         </div>
-        <FwToggle fw={fw} setFw={setFw} frameworks={frameworks} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <FwToggle fw={fw} setFw={setFw} frameworks={frameworks} />
+          <button
+            onClick={() => { if (window.confirm("Clear all scanned files?")) onClearAll?.(); }}
+            style={{ padding: "4px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer", background: "transparent", color: "#A32D2D", border: "0.5px solid #A32D2D", fontWeight: 500 }}>
+            Clear all
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -99,7 +106,6 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
               <th onClick={() => handleSort('severity')} style={{ textAlign: "left", padding: "10px 8px", fontWeight: 500, fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0", cursor: "pointer" }}>Severity{sortArrow('severity')}</th>
               <th style={{ textAlign: "left", padding: "10px 8px", fontWeight: 500, fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0" }}>Key detectors</th>
               <th style={{ textAlign: "left", padding: "10px 8px", fontWeight: 500, fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0" }}>Retention</th>
-              <th style={{ textAlign: "left", padding: "10px 8px", fontWeight: 500, fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -146,9 +152,6 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
                       </div>
                     </div>
                   ) : <span style={{ color: "#ccc", fontSize: 12 }}>—</span>}
-                </td>
-                <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
-                  {doc.action ? <ActionBadge action={doc.action} /> : <span style={{ color: "#ccc", fontSize: 12 }}>—</span>}
                 </td>
               </tr>
             ))}

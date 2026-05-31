@@ -8,10 +8,12 @@ const SEV_BORDER = { critical: '#F7C1C1', high: '#F5C4B3', medium: '#FAC775', lo
 const REG_DOT = { critical: '#A32D2D', high: '#D85A30', medium: '#BA7517' };
 
 function ClassificationCard({ doc, fw, frameworks, assessment }) {
-  const sev = doc.severity || 'info';
+  const activeTier = effectiveTier(doc, fw);
+  // When the effective tier is "open", show neutral styling even if underlying severity is higher
+  const sev = activeTier === "open" ? "low" : (doc.severity || 'info');
   const detected = (doc.signals || []).filter(s => s.detected);
   const conf = doc.conf || 0;
-  const tierLabel = frameworks[fw]?.tiers?.[effectiveTier(doc, fw)]?.label || doc.tier;
+  const tierLabel = frameworks[fw]?.tiers?.[activeTier]?.label || doc.tier;
   const riskScore = assessment?.risk_score ?? doc.riskScore ?? 0;
 
   return (

@@ -70,6 +70,13 @@ export default function App() {
   const handleSelectDoc = (idx) => { setSelectedIdx(idx); setTab(3); };
   const handleBack = () => setTab(2);
 
+  const handleClearAll = useCallback(async () => {
+    try { await fetch(`${API}/results`, { method: "DELETE" }); } catch (_) {}
+    setScannedDocs([]);
+    setSelectedIdx(null);
+    setTab(0);
+  }, []);
+
   return (
     <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: "#2C2C2A", maxWidth: 960, margin: "0 auto", padding: "0 16px" }}>
       {/* Header */}
@@ -103,7 +110,7 @@ export default function App() {
       {/* Tab content */}
       {tab === 0 && <Upload onResults={handleScanResults} scanning={scanning} setScanning={setScanning} frameworks={frameworks} fw={fw} />}
       {tab === 1 && <Datasets fw={fw} setFw={setFw} frameworks={frameworks} scannedDocs={scannedDocs} />}
-      {tab === 2 && <DocScan fw={fw} setFw={setFw} frameworks={frameworks} docs={scannedDocs} onSelectDoc={handleSelectDoc} />}
+      {tab === 2 && <DocScan fw={fw} setFw={setFw} frameworks={frameworks} docs={scannedDocs} onSelectDoc={handleSelectDoc} onClearAll={handleClearAll} />}
       {tab === 3 && <DocDetail fw={fw} setFw={setFw} frameworks={frameworks} doc={scannedDocs[selectedIdx]} onBack={handleBack} />}
       {tab === 4 && <ExecSummary fw={fw} setFw={setFw} frameworks={frameworks} docs={scannedDocs} />}
       {tab === 5 && <Retention fw={fw} frameworks={frameworks} docs={scannedDocs} />}

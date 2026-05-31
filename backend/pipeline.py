@@ -90,7 +90,33 @@ def scan(filename: str, content: bytes) -> dict:
     except Exception as e:
         print(f"LLM explain skipped: {e}")
 
-    # Apply LLM column reasoning text only — tier is NOT overridden
+    # ── Entity-only + LLM confirmation → public data override ────────────────
+    # When signals contain ONLY entity-level data (no personal identifiers)
+    # AND the LLM reads the document and says "open", the LLM is authoritative.
+    # This handles publicly disclosed entity documents (fee schedules, annual
+    # reports, public price lists, regulatory filings) without hardcoding their
+    # filenames or doc types. The spec's "no LLM tier override" principle
+    # protects against downgrading sensitive personal data — not against the LLM
+    # correctly reading "published for customer information" vs "internal only."
+    _ENTITY_ONLY_SIGNALS = {"Private entity data", "All signals clear", "Incidental contact details"}
+    _PERSONAL_SIGNALS    = {"Linkable identity", "Financial data linked to persons",
+                            "Sensitive personal data", "AML/CFT regulated data",
+                            "Employment data linked to persons", "Personal data",
+                            "Credentials / system access"}
+    detected_names = {s["name"] for s in signals if s.get("detected") and s.get("sev") != "info"}
+    only_entity    = bool(detected_names) and detected_names.issubset(_ENTITY_ONLY_SIGNALS)
+    has_personal   = bool(detected_names & _PERSONAL_SIGNALS)
+
+    if (llm_result
+            and llm_result.get("public_disclosure") is True
+            and only_entity
+            and not has_personal
+            and tier == "conf"):
+        tier      = "open"
+        tier_pdpl = "open"
+        fw_note   = build_fw_note("open", doc_type, signals, tier_pdpl="open")
+
+    # Apply LLM column reasoning text only — tier is NOT overridden for personal data
     if llm_result and llm_result.get("source") == "llm":
         col_tiers = llm_result.get("column_tiers", {})
 
