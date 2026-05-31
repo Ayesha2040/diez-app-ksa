@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API, SEV } from '../config';
+import { API, SEV, effectiveTier } from '../config';
 import { Pill, Card, MetricCard, ActionBadge } from '../components';
 
 export default function ReviewQueue({ fw, frameworks, docs, onDocUpdate }) {
@@ -76,7 +76,7 @@ export default function ReviewQueue({ fw, frameworks, docs, onDocUpdate }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A" }}>{doc.name}</div>
-                <Pill tier={doc.tier} fw={fw} frameworks={frameworks} />
+                <Pill tier={effectiveTier(doc, fw)} fw={fw} frameworks={frameworks} />
                 <ActionBadge action={doc.action} />
               </div>
               <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>

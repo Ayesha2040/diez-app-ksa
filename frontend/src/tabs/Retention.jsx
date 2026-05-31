@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API, SEV } from '../config';
+import { API, SEV, effectiveTier } from '../config';
 import { Pill, Card, MetricCard } from '../components';
 
 const STATUS_STYLE = {
@@ -154,7 +154,7 @@ export default function Retention({ fw, frameworks, docs }) {
                     <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{item.docType}</div>
                   </td>
                   <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
-                    <Pill tier={item.tier} fw={fw} frameworks={frameworks} />
+                    <Pill tier={effectiveTier(item, fw)} fw={fw} frameworks={frameworks} />
                   </td>
                   <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
                     <span style={{ fontWeight: 500, color: "#2C2C2A" }}>

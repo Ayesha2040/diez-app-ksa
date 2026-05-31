@@ -11,7 +11,7 @@ from extractors import EXTRACTORS
 from engine import (classify_doc_type, build_signals, calc_risk_score,
                     calc_confidence, calc_breakdown, compute_action,
                     determine_severity, redact_preview)
-from frameworks import determine_tier, build_fw_note
+from frameworks import determine_tier, determine_pdpl_tier, build_fw_note
 from llm import classify as llm_explain, build_metadata as llm_build_metadata
 from agent import run_agent
 from retention import assign_retention
@@ -49,10 +49,13 @@ def scan(filename: str, content: bytes) -> dict:
     signals  = build_signals(doc_type, entities, keywords, extraction)
 
     # ── 5. POLICY ENGINE — single source of truth for the tier ───────────────
-    tier     = determine_tier(signals, extraction.get("rows") or 0)
-    severity = determine_severity(signals)
+    rows_count = extraction.get("rows") or 0
+    tier       = determine_tier(signals, rows_count)
+    tier_pdpl  = determine_pdpl_tier(signals, rows_count)   # PDPL excludes entity-only signals
+    severity   = determine_severity(signals)
     breakdown = calc_breakdown(entities, keywords)
-    fw_note   = build_fw_note(tier, doc_type, signals)
+    # fw_note uses the correct tier per framework
+    fw_note   = build_fw_note(tier, doc_type, signals, tier_pdpl=tier_pdpl)
 
     # ── 6. CONFLICT DETECTION ─────────────────────────────────────────────────
     fn_lower     = filename.lower()
@@ -142,8 +145,10 @@ def scan(filename: str, content: bytes) -> dict:
         "size":        size_str,
         "rows":        str(extraction["rows"]) if extraction.get("rows") else None,
 
-        # Classification (policy engine is source of truth)
+        # Classification — NDMO tier is primary; PDPL tier is computed separately
+        # because PDPL only governs personal data (entity-only signals → "open")
         "tier":        tier,
+        "tierPdpl":    tier_pdpl,
         "severity":    severity,
         "fwNote":      fw_note,
 

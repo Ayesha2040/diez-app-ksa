@@ -32,6 +32,32 @@ FRAMEWORKS = {
 }
 
 
+# Signals that involve personal data of identifiable individuals under PDPL.
+# "Private entity data" is explicitly excluded — PDPL does not apply to entity
+# financial data (fee schedules, price lists, company financials, etc.).
+_PDPL_PERSONAL_SIGNALS = {
+    "Linkable identity",
+    "Financial data linked to persons",
+    "Sensitive personal data",
+    "AML/CFT regulated data",
+    "Employment data linked to persons",
+    "Personal data",
+    "Credentials / system access",
+}
+
+
+def determine_pdpl_tier(signals: list, rows: int = 0) -> str:
+    """
+    PDPL-specific tier — only counts signals that involve personal data of
+    identifiable individuals. 'Private entity data' maps to 'open' under PDPL
+    because PDPL does not govern entity-level financial or business data.
+    """
+    pdpl_signals = [s for s in signals if s.get("name") in _PDPL_PERSONAL_SIGNALS]
+    if not pdpl_signals:
+        return "open"
+    return determine_tier(pdpl_signals, rows)
+
+
 def determine_tier(signals: list, rows: int = 0) -> str:
     det = [s for s in signals if s.get("detected")]
     if not det:
@@ -62,22 +88,24 @@ def determine_severity(signals: list) -> str:
     return "low"
 
 
-def build_fw_note(tier: str, doc_type: str, signals: list) -> dict:
+def build_fw_note(tier: str, doc_type: str, signals: list, tier_pdpl: str = None) -> dict:
     notes = {}
     for fw_id, fw in FRAMEWORKS.items():
-        tier_label = fw["tiers"][tier]["label"]
+        # Use PDPL-specific tier for the PDPL framework note
+        effective_tier = (tier_pdpl if tier_pdpl and fw_id == "pdpl" else tier)
+        tier_label = fw["tiers"][effective_tier]["label"]
 
-        if tier == "open":
+        if effective_tier == "open":
             if fw_id == "ndmo":
                 notes[fw_id] = f"No sensitive data detected. Classified {tier_label} under NDMO policy. Suitable for publication on Saudi Open Data Platform (data.gov.sa)."
             else:
                 notes[fw_id] = f"KSA PDPL does not apply — no personal data present. No consent or data subject rights obligations. Suitable for unrestricted sharing."
-        elif tier == "secret":
+        elif effective_tier == "secret":
             if fw_id == "ndmo":
                 notes[fw_id] = f"Classified {tier_label} under NDMO policy. Access restricted to named individuals only. SDAIA approval required before any exchange. Cross-border transfer prohibited without SDAIA sign-off per KSA PDPL Art. 29."
             else:
                 notes[fw_id] = f"KSA PDPL Art. 1 Sensitive — explicit consent mandatory (Art. 5). Legitimate interest NOT valid for sensitive data. DPO appointment required. Cross-border transfer requires SDAIA adequacy assessment (Art. 29). Penalties: up to SAR 3M / 2 years imprisonment for unauthorised disclosure."
-        elif tier == "sens":
+        elif effective_tier == "sens":
             if fw_id == "ndmo":
                 notes[fw_id] = f"Classified {tier_label} under NDMO policy. Mandatory encryption at rest and in transit. Explicit consent required per KSA PDPL Art. 5. DPO appointment required if sensitive data processing is a core activity."
             else:

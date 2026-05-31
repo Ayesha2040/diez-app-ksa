@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pill, SevDot, SrcIcon, DetTag, ConfBar, MetricCard, FwToggle, ActionBadge } from '../components';
-import { SEV } from '../config';
+import { SEV, effectiveTier } from '../config';
 
 export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
   const [sortBy, setSortBy] = useState(null);
@@ -115,7 +115,7 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc }) {
                   </span>
                 </td>
                 <td style={{ padding: "10px 8px", fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0" }}>{doc.docType}</td>
-                <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}><Pill tier={doc.tier} fw={fw} frameworks={frameworks} /></td>
+                <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}><Pill tier={effectiveTier(doc, fw)} fw={fw} frameworks={frameworks} /></td>
                 <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}><ConfBar val={doc.conf} sev={doc.severity} /></td>
                 <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

@@ -1,5 +1,5 @@
 import { Pill, SevDot, Card, SignalAnalysis, MetaRow, FwToggle, ActionBadge } from '../components';
-import { SEV } from '../config';
+import { SEV, effectiveTier } from '../config';
 
 const SEV_ACCENT = { critical: '#A32D2D', high: '#D85A30', medium: '#BA7517', low: '#639922', info: '#888780' };
 const SEV_BG = { critical: '#FCEBEB', high: '#FAECE7', medium: '#FAEEDA', low: '#EAF3DE', info: '#F1EFE8' };
@@ -11,7 +11,7 @@ function ClassificationCard({ doc, fw, frameworks, assessment }) {
   const sev = doc.severity || 'info';
   const detected = (doc.signals || []).filter(s => s.detected);
   const conf = doc.conf || 0;
-  const tierLabel = frameworks[fw]?.tiers?.[doc.tier]?.label || doc.tier;
+  const tierLabel = frameworks[fw]?.tiers?.[effectiveTier(doc, fw)]?.label || doc.tier;
   const riskScore = assessment?.risk_score ?? doc.riskScore ?? 0;
 
   return (
@@ -232,7 +232,7 @@ export default function DocDetail({ fw, setFw, frameworks, doc, onBack }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 16px", flexWrap: "wrap" }}>
-        <Pill tier={doc.tier} fw={fw} frameworks={frameworks} />
+        <Pill tier={effectiveTier(doc, fw)} fw={fw} frameworks={frameworks} />
         {doc.action && <ActionBadge action={doc.action} />}
         <button style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#F5F4F0", color: "#5F5E5A", border: "0.5px solid #e5e4e0" }}>Override</button>
         <button style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#2C2C2A", color: "#fff", border: "none" }}>Apply policy</button>
