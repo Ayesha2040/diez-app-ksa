@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pill, SrcIcon, Card, MetricCard, FwToggle } from '../components';
+import { effectiveTier } from '../config';
 
 // Sample datasets — used only when no files uploaded. Classifications reflect
 // what the LLM would produce: trade licence = private entity data (conf),
@@ -8,7 +9,7 @@ const SAMPLE_DATASETS = [
   {
     id: "hr", name: "HR_Employee_Master", source: "Oracle Fusion", sourceTag: "OR", sourceColor: "#993C1D",
     desc: "Core employee records — demographics, compensation, religion, org structure",
-    rows: "2,847", tier: "sens",
+    rows: "2,847", tier: "sens", tierPdpl: "sens",
     aiNote: "Classified Secret — religion column is sensitive personal data under KSA PDPL Art. 1 (religious belief). Names, National ID, email, salary, and IBAN are personal data (KSA PDPL Art. 1) — not sensitive. Internal employee IDs, department, job title, and dates are non-personal. Explicit consent required for religion column per Art. 5.",
     columns: [
       { name: "EMPLOYEE_ID",   dtype: "VARCHAR", tier: "open",  reason: "Internal reference — non-personal",             sample: "EMP-10XXXX" },
@@ -30,7 +31,7 @@ const SAMPLE_DATASETS = [
   {
     id: "crm", name: "CRM_Customer_Accounts", source: "Salesforce", sourceTag: "SF", sourceColor: "#0F6E56",
     desc: "Customer relationship records — contacts, commercial registrations, revenue data",
-    rows: "14,200", tier: "conf",
+    rows: "14,200", tier: "conf", tierPdpl: "conf",
     aiNote: "Classified by AI based on column semantics and KSA PDPL Art. 1. Commercial registration and revenue are private entity data (NDMO Confidential), not personal data. Contact names and National IDs are personal data under KSA PDPL Art. 1.",
     columns: [
       { name: "ACCOUNT_NAME",       dtype: "VARCHAR", tier: "open",  reason: "Public entity name",                       sample: "Acme Trading LLC" },
@@ -48,7 +49,7 @@ const SAMPLE_DATASETS = [
   {
     id: "fin", name: "Vendor_Payment_Ledger", source: "Oracle Fusion", sourceTag: "OR", sourceColor: "#993C1D",
     desc: "Accounts payable — vendor payments, IBANs, invoice amounts",
-    rows: "420", tier: "conf",
+    rows: "420", tier: "conf", tierPdpl: "open",
     aiNote: "Classified Confidential. IBAN is personal data under KSA PDPL Art. 1 (banking identifier linked to identifiable persons), not sensitive data. Payment amounts are entity financial data. VAT numbers are entity identifiers under ZATCA. Standard lawful basis required for processing.",
     columns: [
       { name: "VENDOR_NAME",    dtype: "VARCHAR", tier: "open",  reason: "Public entity name",                       sample: "Al Rajhi Trading" },
@@ -64,7 +65,7 @@ const SAMPLE_DATASETS = [
   {
     id: "cr", name: "Commercial_Registry_Extract", source: "Salesforce", sourceTag: "SF", sourceColor: "#0F6E56",
     desc: "Public registry extract — active commercial registrations in KSA",
-    rows: "3,100", tier: "open",
+    rows: "3,100", tier: "open", tierPdpl: "open",
     aiNote: "Classified by AI as non-personal. All columns are public registry data — company names, registration numbers, activity codes. No personal data present. Sourced from Ministry of Commerce public records.",
     columns: [
       { name: "CR_NUMBER",    dtype: "VARCHAR", tier: "open", reason: "Public entity identifier",  sample: "1010123456" },
@@ -79,6 +80,13 @@ const SAMPLE_DATASETS = [
     },
   },
 ];
+
+const _TIER_ORDER = { open: 0, conf: 1, sens: 2, secret: 3 };
+const _maxTier = (cols) => {
+  if (!cols || !cols.length) return "open";
+  return cols.reduce((max, c) =>
+    (_TIER_ORDER[c.tier] || 0) > (_TIER_ORDER[max] || 0) ? c.tier : max, "open");
+};
 
 export default function Datasets({ fw, setFw, frameworks, scannedDocs }) {
   const [expanded, setExpanded] = useState(null);
@@ -96,15 +104,20 @@ export default function Datasets({ fw, setFw, frameworks, scannedDocs }) {
       sourceColor: d.sourceColor,
       desc: `Uploaded ${d.docType?.toLowerCase() || 'file'} — ${d.rows} rows`,
       rows: d.rows,
-      tier: d.tier,
+      // Document tier in Datasets inherits the highest column-level tier —
+      // consistent with what the user sees in the column table.
+      // (Signal-based tier lives in DocScan/DocDetail where it belongs.)
+      tier:     _maxTier(d.columns),
+      tierPdpl: _maxTier(d.columns),
       aiNote: d.llmAssessment?.summary || null,
-      aiClassified: d.llmAssessment?.source === 'llm',
-      columns: d.columns.map(c => ({
+      aiClassified: d.columns?.some(c => c.aiResolved) ?? false,
+      columns: (d.columns || []).map(c => ({
         name: c.name,
         dtype: c.dtype,
         tier: c.tier || "open",
         reason: c.reason || c.det || "—",
-        sample: c.sample || (c.samples && c.samples[0]) || "—",
+        sample: c.sample || "—",
+        aiResolved: c.aiResolved,
       })),
       fwNote: d.fwNote,
     }));
@@ -182,16 +195,26 @@ export default function Datasets({ fw, setFw, frameworks, scannedDocs }) {
                     ))}</tr>
                   </thead>
                   <tbody>{ds.columns.map((c, i) => (
-                    <tr key={i}>
+                    <tr key={i} style={{ background: c.aiResolved ? "#F5F4FE" : "transparent" }}>
                       <td style={{ padding: 8, fontWeight: 500, borderBottom: "0.5px solid #e5e4e0" }}>{c.name}</td>
                       <td style={{ padding: 8, color: "#888", borderBottom: "0.5px solid #e5e4e0" }}>{c.dtype}</td>
-                      <td style={{ padding: 8, borderBottom: "0.5px solid #e5e4e0" }}><Pill tier={c.tier} fw={fw} frameworks={frameworks} /></td>
                       <td style={{ padding: 8, borderBottom: "0.5px solid #e5e4e0" }}>
-                        <span style={{
-                          display: "inline-flex", alignItems: "center", fontSize: 11,
-                          padding: "2px 8px", borderRadius: 10,
-                          background: "#F1EFE8", color: "#5F5E5A",
-                        }}>{c.reason}</span>
+                        <Pill tier={c.tier} fw={fw} frameworks={frameworks} />
+                      </td>
+                      <td style={{ padding: 8, borderBottom: "0.5px solid #e5e4e0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", fontSize: 11,
+                            padding: "2px 8px", borderRadius: 10,
+                            background: c.aiResolved ? "#EEEDFE" : "#F1EFE8",
+                            color: c.aiResolved ? "#3C3489" : "#5F5E5A",
+                          }}>
+                            {c.reason && c.reason !== "None" ? c.reason : "—"}
+                          </span>
+                          {c.aiResolved && (
+                            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#EEEDFE", color: "#3C3489", fontWeight: 500 }}>AI</span>
+                          )}
+                        </div>
                       </td>
                       <td dir="auto" style={{ padding: 8, fontFamily: "Tahoma, monospace", fontSize: 11, color: "#888", borderBottom: "0.5px solid #e5e4e0" }}>{c.sample}</td>
                     </tr>

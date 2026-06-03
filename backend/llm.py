@@ -126,7 +126,11 @@ def build_metadata(filename, doc_type, signals, columns, extraction, text=""):
 
     col_info = []
     if columns:
-        for c in columns:
+        # Cap at 30 columns — beyond that the LLM response grows too large and
+        # JSON parsing fails. Prioritise sensitive/conf columns first.
+        tier_order = {"sens": 0, "secret": 0, "conf": 1, "open": 2}
+        sorted_cols = sorted(columns, key=lambda c: tier_order.get(c.get("tier","open"), 2))
+        for c in sorted_cols[:30]:
             col_info.append({
                 "name": c["name"],
                 "dtype": c.get("dtype", ""),
@@ -143,3 +147,150 @@ def build_metadata(filename, doc_type, signals, columns, extraction, text=""):
         "row_count":       extraction.get("rows"),
         "is_structured":   extraction.get("structured", False),
     }
+
+
+# ═══════════════════════════════════════════
+# AI CLASSIFICATION  (haiku — fast + cheap)
+# Replaces the rule engine as tier source when mode="ai".
+# Uses haiku not sonnet: classification is a clear structured task,
+# haiku is ~10x cheaper and fast enough. Sonnet is still used for explain.
+# ═══════════════════════════════════════════
+
+from retention import RECORD_CLASS_NAMES
+
+# ═══════════════════════════════════════════
+# AMBIGUOUS COLUMN RESOLVER
+# Called automatically when column names didn't match any rule.
+# Sends all ambiguous columns in ONE haiku call — not one call per column.
+# ═══════════════════════════════════════════
+
+_COL_RESOLVE_SYSTEM = """You are a KSA data classification expert. You receive a list of columns from a structured file where automated rule-based detection found no match. For each column, classify it based on name, data type, and sample values.
+
+For each column return:
+- "tier": "open" | "conf" | "sens"
+  - sens  = Saudi National ID, Iqama, passport, biometric, health, genetic, criminal, religious data
+  - conf  = name, email, phone, DOB, salary, IBAN, address, nationality, gender, commercial data
+  - open  = employee ID, department, job title, dates, status codes, product codes, non-personal data
+- "det": short detector label (e.g. "AI · Salary", "AI · Person name", "AI · Internal ID")
+- "reason": 3-6 words referencing KSA PDPL Art. 1 or NDMO if applicable
+
+Respond ONLY with a JSON object mapping column name → {tier, det, reason}.
+No markdown, no preamble."""
+
+
+def resolve_ambiguous_columns(ambiguous_cols: list, filename: str) -> dict:
+    """
+    One LLM call to classify all columns the rule engine couldn't match.
+    Uses Anthropic haiku if available, falls back to OpenAI gpt-4o-mini.
+    Returns {column_name: {tier, det, reason}} for each ambiguous column.
+    """
+    if not ambiguous_cols or (not ANTHROPIC_KEY and not OPENAI_KEY):
+        return {}
+
+    payload = {
+        "file": filename,
+        "columns": [
+            {"name": c["name"], "dtype": c.get("dtype", ""), "samples": c.get("samples", [])[:5]}
+            for c in ambiguous_cols
+        ],
+    }
+
+    try:
+        if ANTHROPIC_KEY:
+            resp = httpx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 512, "system": _COL_RESOLVE_SYSTEM,
+                      "messages": [{"role": "user", "content": json.dumps(payload)}]},
+                timeout=12.0,
+            )
+            resp.raise_for_status()
+            raw = resp.json().get("content", [{}])[0].get("text", "").strip()
+        else:
+            resp = httpx.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"},
+                json={"model": "gpt-4o-mini", "max_tokens": 512, "temperature": 0,
+                      "messages": [{"role": "system", "content": _COL_RESOLVE_SYSTEM},
+                                   {"role": "user", "content": json.dumps(payload)}]},
+                timeout=12.0,
+            )
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        return json.loads(raw.strip())
+    except Exception as e:
+        print(f"Ambiguous column resolution failed: {e}")
+        return {}
+
+_AI_CLASSIFY_SYSTEM = f"""You are a KSA data classification expert. Given a document's metadata and a short text excerpt, output a JSON object with exactly these fields:
+
+1. "tier": One of "open", "conf", "sens", "secret" — based on KSA NDMO policy:
+   - "open"   = no personal or sensitive data; suitable for public release
+   - "conf"   = personal data under PDPL Art. 1 OR private entity data not for public release
+   - "sens"   = sensitive personal data (PDPL Art. 1 sensitive categories) or financial identifiers linked to persons
+   - "secret" = strategic/classified content, credentials, or bulk sensitive PII
+
+2. "reasoning": One concise sentence explaining the tier decision.
+
+3. "record_class": The single most appropriate class from this list:
+{chr(10).join(f'   - {c}' for c in RECORD_CLASS_NAMES)}
+
+Respond ONLY with valid JSON. No markdown, no preamble."""
+
+
+def classify_ai(filename: str, doc_type: str, signals: list, text: str) -> dict | None:
+    """
+    AI-mode classification — assigns tier and record class directly.
+    Uses Anthropic haiku if available, falls back to OpenAI gpt-4o-mini.
+    """
+    if not ANTHROPIC_KEY and not OPENAI_KEY:
+        return None
+
+    sig_names = [s["name"] for s in signals if s.get("detected") and s.get("sev") != "info"]
+    payload = {
+        "file_name":    filename,
+        "doc_type":     doc_type,
+        "signals":      sig_names,
+        "text_excerpt": (text or "")[:600],   # short — classification doesn't need full excerpt
+    }
+
+    for attempt in range(2):
+        try:
+            if ANTHROPIC_KEY:
+                resp = httpx.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                    json={"model": "claude-haiku-4-5-20251001", "max_tokens": 256, "system": _AI_CLASSIFY_SYSTEM,
+                          "messages": [{"role": "user", "content": json.dumps(payload)}]},
+                    timeout=12.0,
+                )
+                resp.raise_for_status()
+                raw = resp.json().get("content", [{}])[0].get("text", "").strip()
+            else:
+                resp = httpx.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"},
+                    json={"model": "gpt-4o-mini", "max_tokens": 256, "temperature": 0,
+                          "messages": [{"role": "system", "content": _AI_CLASSIFY_SYSTEM},
+                                       {"role": "user", "content": json.dumps(payload)}]},
+                    timeout=12.0,
+                )
+                resp.raise_for_status()
+                raw = resp.json()["choices"][0]["message"]["content"].strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            result = json.loads(raw.strip())
+            result["source"] = "ai"
+            return result
+        except Exception as e:
+            if attempt == 0:
+                continue
+            print(f"AI classification failed: {e}")
+            return None

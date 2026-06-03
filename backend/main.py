@@ -31,8 +31,9 @@ async def get_frameworks():
 
 @app.post("/api/scan")
 async def scan_file(file: UploadFile = File(...)):
+    """Always runs hybrid when ANTHROPIC_API_KEY is set — stores both rules and AI column results."""
     content = await file.read()
-    result = scan(file.filename or "unknown", content)
+    result = scan(file.filename or "unknown", content, mode="hybrid")
     if "error" not in result:
         store.append(result)
     return result
@@ -43,7 +44,7 @@ async def scan_batch(files: list[UploadFile] = File(...)):
     results = []
     for f in files:
         content = await f.read()
-        result = scan(f.filename or "unknown", content)
+        result = scan(f.filename or "unknown", content, mode="hybrid")
         if "error" not in result:
             store.append(result)
         results.append(result)

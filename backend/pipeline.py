@@ -12,12 +12,17 @@ from engine import (classify_doc_type, build_signals, calc_risk_score,
                     calc_confidence, calc_breakdown, compute_action,
                     determine_severity, redact_preview)
 from frameworks import determine_tier, determine_pdpl_tier, build_fw_note
-from llm import classify as llm_explain, build_metadata as llm_build_metadata
+from llm import classify as llm_explain, build_metadata as llm_build_metadata, classify_ai, resolve_ambiguous_columns
 from agent import run_agent
 from retention import assign_retention
 
 
-def scan(filename: str, content: bytes) -> dict:
+def scan(filename: str, content: bytes, mode: str = "rules") -> dict:
+    """
+    mode="rules" — deterministic rule engine assigns tier (default).
+    mode="ai"    — haiku reads document and assigns tier + record class directly.
+    In both modes signals are detected and sonnet writes the explanation.
+    """
     """Full scan pipeline. Returns a result dict with tier, risk, confidence, action, retention."""
     ext  = Path(filename).suffix.lower()
     size = len(content)
@@ -43,6 +48,9 @@ def scan(filename: str, content: bytes) -> dict:
         chars_read  = min(len(text), 15000)
         chars_total = extraction.get("chars_total", chars_read) or chars_read
         coverage    = min(1.0, chars_read / max(chars_total, 1))
+        # Image-only PDFs extract almost no text — mark coverage near zero
+        if not extraction.get("structured") and len(text.strip()) < 200:
+            coverage = 0.05
 
     # ── 4. CLASSIFY ──────────────────────────────────────────────────────────
     doc_type = classify_doc_type(filename, extraction, entities, keywords)
@@ -56,6 +64,15 @@ def scan(filename: str, content: bytes) -> dict:
     breakdown = calc_breakdown(entities, keywords)
     # fw_note uses the correct tier per framework
     fw_note   = build_fw_note(tier, doc_type, signals, tier_pdpl=tier_pdpl)
+
+    # ── 5b. AI MODE — haiku overrides rule-engine tier ───────────────────────
+    ai_classification = None
+    if mode == "ai":
+        ai_classification = classify_ai(filename, doc_type, signals, text)
+        if ai_classification and ai_classification.get("tier") in ("open", "conf", "sens", "secret"):
+            tier      = ai_classification["tier"]
+            tier_pdpl = tier  # AI mode: single tier for both frameworks
+            fw_note   = build_fw_note(tier, doc_type, signals, tier_pdpl=tier_pdpl)
 
     # ── 6. CONFLICT DETECTION ─────────────────────────────────────────────────
     fn_lower     = filename.lower()
@@ -81,6 +98,37 @@ def scan(filename: str, content: bytes) -> dict:
 
     # ── 10. COLUMN METADATA ───────────────────────────────────────────────────
     columns = col_details  # built by detect_columns(), no second pass
+
+    # Snapshot rules-only columns before AI modifies any of them
+    rules_columns = [dict(c) for c in (columns or [])]
+
+    # HYBRID: resolve ambiguous columns via one haiku batch call.
+    # Columns the rule engine couldn't match (det == "None") are sent to
+    # haiku with their sample values. One call covers ALL ambiguous columns.
+    if mode == "hybrid" and columns:
+        ambiguous_raw = [
+            ci for ci in (extraction.get("cols") or [])
+            if any(c["name"] == ci["name"] and c.get("det") == "None" for c in columns)
+            # Skip pandas artefacts from merged headers — not real columns
+            and not str(ci.get("name","")).startswith("Unnamed:")
+        ]
+        if ambiguous_raw:
+            ai_cols = resolve_ambiguous_columns(ambiguous_raw, filename)
+            ambiguous_names = {ci["name"] for ci in ambiguous_raw}
+            for col in columns:
+                if col["name"] not in ambiguous_names:
+                    continue
+                # Mark as AI-reviewed regardless of whether tier changed
+                col["aiResolved"] = True
+                if ai_cols and col["name"] in ai_cols:
+                    resolved        = ai_cols[col["name"]]
+                    col["tier"]     = resolved.get("tier", col["tier"])
+                    col["det"]      = resolved.get("det", "AI · reviewed")
+                    col["reason"]   = resolved.get("reason", col.get("reason", ""))
+                else:
+                    # AI unavailable or returned nothing — mark clearly
+                    col["det"]    = "Unclassified" if not col.get("det") or col["det"] == "None" else col["det"]
+                    col["reason"] = col.get("reason") or "No rule matched — needs manual review"
 
     # ── 11. EXPLAIN (LLM — no decision power, explain-only) ─────────────────
     llm_result = None
@@ -171,6 +219,10 @@ def scan(filename: str, content: bytes) -> dict:
         "size":        size_str,
         "rows":        str(extraction["rows"]) if extraction.get("rows") else None,
 
+        # Classification mode
+        "classificationMode": mode,
+        "aiClassification":   ai_classification,
+
         # Classification — NDMO tier is primary; PDPL tier is computed separately
         # because PDPL only governs personal data (entity-only signals → "open")
         "tier":        tier,
@@ -192,6 +244,9 @@ def scan(filename: str, content: bytes) -> dict:
         "detBreakdown": breakdown,
         "signals":     signals,
         "columns":     columns,
+        # Always store the rules-only snapshot so the view toggle works
+        # regardless of whether AI changed anything
+        "rulesColumns": rules_columns if (columns and mode == "hybrid") else None,
 
         # LLM explanation (no tier power)
         "llmAssessment": llm_result,

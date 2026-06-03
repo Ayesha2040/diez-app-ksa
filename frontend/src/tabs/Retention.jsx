@@ -138,7 +138,7 @@ export default function Retention({ fw, frameworks, docs }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr>
-              {["File", "Classification", "Retention period", "Legal basis", "Disposal action", "Review date", "Status", ""].map(h => (
+              {["File", "Record class", "Period", "Disposal action", "Review date", "Status"].map(h => (
                 <th key={h} style={{ textAlign: "left", padding: "10px 8px", fontWeight: 500, fontSize: 12, color: "#5F5E5A", borderBottom: "0.5px solid #e5e4e0" }}>{h}</th>
               ))}
             </tr>
@@ -153,19 +153,22 @@ export default function Retention({ fw, frameworks, docs }) {
                     <div style={{ fontWeight: 500, color: "#2C2C2A", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
                     <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{item.docType}</div>
                   </td>
-                  <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
-                    <Pill tier={effectiveTier(item, fw)} fw={fw} frameworks={frameworks} />
-                  </td>
-                  <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
-                    <span style={{ fontWeight: 500, color: "#2C2C2A" }}>
-                      {ret.periodYears > 0 ? `${ret.periodYears} years` : "No minimum"}
-                    </span>
-                    <DaysChip days={ret.daysRemaining} status={ret.status} />
-                  </td>
                   <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0", maxWidth: 220 }}>
-                    <span style={{ fontSize: 11, color: "#5F5E5A", lineHeight: 1.5 }}>
-                      {ret.basis || "—"}
+                    <div style={{ fontWeight: 500, fontSize: 13, color: "#2C2C2A", marginBottom: 4 }}>
+                      {ret.recordClass || "—"}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                      <Pill tier={effectiveTier(item, fw)} fw={fw} frameworks={frameworks} />
+                      {ret.classMethod === "ai" && (
+                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#EEEDFE", color: "#3C3489", fontWeight: 500 }}>AI</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0", whiteSpace: "nowrap" }}>
+                    <span style={{ fontWeight: 500, color: "#2C2C2A" }}>
+                      {ret.periodYears > 0 ? `${ret.periodYears} yrs` : "None"}
                     </span>
+                    <div><DaysChip days={ret.daysRemaining} status={ret.status} /></div>
                   </td>
                   <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
                     <span style={{ background: "#F1EFE8", color: "#5F5E5A", padding: "2px 8px", borderRadius: 4, fontSize: 11 }}>
@@ -179,22 +182,6 @@ export default function Retention({ fw, frameworks, docs }) {
                   </td>
                   <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
                     <StatusBadge status={ret.status || "active"} />
-                  </td>
-                  <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
-                    {!isDisposed && (
-                      <button
-                        onClick={() => handleDispose(item.id)}
-                        disabled={disposing === item.id}
-                        style={{
-                          padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-                          background: "transparent", color: "#A32D2D",
-                          border: "0.5px solid #A32D2D", fontWeight: 500,
-                          opacity: disposing === item.id ? 0.5 : 1,
-                        }}
-                      >
-                        {disposing === item.id ? "..." : "Mark disposed"}
-                      </button>
-                    )}
                   </td>
                 </tr>
               );

@@ -118,10 +118,22 @@ function RetentionCard({ retention }) {
           </svg>
           Retention schedule
         </div>
-        <span style={{ background: st.bg, color: st.fg, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500 }}>
-          {st.label}
-        </span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {retention.classMethod === "ai" && (
+            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#EEEDFE", color: "#3C3489", fontWeight: 500 }}>AI classified</span>
+          )}
+          <span style={{ background: st.bg, color: st.fg, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500 }}>
+            {st.label}
+          </span>
+        </div>
       </div>
+
+      {retention.recordClass && (
+        <div style={{ background: "#F5F4F0", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Authoritative Record Class</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: "#2C2C2A" }}>{retention.recordClass}</div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
         <div style={{ background: "#F5F4F0", borderRadius: 8, padding: "10px 14px" }}>
@@ -217,8 +229,8 @@ export default function DocDetail({ fw, setFw, frameworks, doc, onBack }) {
 
   return (
     <div>
-      {/* Back + framework toggle */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      {/* Back + toggles */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div onClick={onBack} style={{ fontSize: 13, color: "#5F5E5A", cursor: "pointer" }}>← Back to scan results</div>
         <FwToggle fw={fw} setFw={setFw} frameworks={frameworks} />
       </div>
@@ -236,6 +248,9 @@ export default function DocDetail({ fw, setFw, frameworks, doc, onBack }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 16px", flexWrap: "wrap" }}>
         <Pill tier={effectiveTier(doc, fw)} fw={fw} frameworks={frameworks} />
         {doc.action && <ActionBadge action={doc.action} />}
+        {doc.classificationMode === "hybrid" && (
+          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#EEEDFE", color: "#3C3489", fontWeight: 500 }}>Hybrid</span>
+        )}
         <button style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#F5F4F0", color: "#5F5E5A", border: "0.5px solid #e5e4e0" }}>Override</button>
         <button style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#2C2C2A", color: "#fff", border: "none" }}>Apply policy</button>
       </div>

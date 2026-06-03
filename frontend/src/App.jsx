@@ -6,9 +6,7 @@ import DocScan from './tabs/DocScan';
 import DocDetail from './tabs/DocDetail';
 import ExecSummary from './tabs/ExecSummary';
 import Retention from './tabs/Retention';
-import ReviewQueue from './tabs/ReviewQueue';
-
-const TABS = ["Upload", "Datasets", "Document scan", "Document detail", "Executive summary", "Retention", "Review queue"];
+const TABS = ["Upload", "Datasets", "Document scan", "Document detail", "Executive summary", "Retention"];
 
 const DEFAULT_FRAMEWORKS = {
   ndmo: { id: "ndmo", label: "NDMO", full: "Saudi National Data Management Office", tiers: {
@@ -114,7 +112,6 @@ export default function App() {
       {tab === 3 && <DocDetail fw={fw} setFw={setFw} frameworks={frameworks} doc={scannedDocs[selectedIdx]} onBack={handleBack} />}
       {tab === 4 && <ExecSummary fw={fw} setFw={setFw} frameworks={frameworks} docs={scannedDocs} />}
       {tab === 5 && <Retention fw={fw} frameworks={frameworks} docs={scannedDocs} />}
-      {tab === 6 && <ReviewQueue fw={fw} frameworks={frameworks} docs={scannedDocs} onDocUpdate={handleDocUpdate} />}
     </div>
   );
 }

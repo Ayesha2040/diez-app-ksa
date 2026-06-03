@@ -108,6 +108,27 @@ const ACTION_STYLES = {
   "spot-check":    { bg: "#F1EFE8", fg: "#5F5E5A", label: "Spot-check" },
 };
 
+// Toggle between rules-only view and hybrid (AI-assisted) view.
+// Only enabled when at least one scanned doc has hybrid data.
+export const ViewToggle = ({ viewMode, setViewMode, hasHybrid }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <span style={{ fontSize: 12, color: "#5F5E5A" }}>View</span>
+    {["rules", "hybrid"].map(m => (
+      <button key={m} onClick={() => setViewMode(m)}
+        disabled={m === "hybrid" && !hasHybrid}
+        style={{
+          padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500,
+          cursor: m === "hybrid" && !hasHybrid ? "not-allowed" : "pointer",
+          background: viewMode === m ? "#2C2C2A" : "transparent",
+          color: viewMode === m ? "#fff" : m === "hybrid" && !hasHybrid ? "#ccc" : "#5F5E5A",
+          border: viewMode === m ? "none" : `0.5px solid ${m === "hybrid" && !hasHybrid ? "#eee" : "#e5e4e0"}`,
+        }}>
+        {m === "rules" ? "Rules" : "Hybrid"}
+      </button>
+    ))}
+  </div>
+);
+
 export const ActionBadge = ({ action }) => {
   const s = ACTION_STYLES[action] || ACTION_STYLES["spot-check"];
   return (

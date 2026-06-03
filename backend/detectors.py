@@ -303,7 +303,7 @@ def detect_columns(cols: list, rows: int) -> tuple:
                     entity_label = "Saudi National ID"
                     sample_validated = True
                 else:
-                    col_det = "None"
+                    col_det = "Column · Employee ID"   # matched — not ambiguous, not sensitive
                     col_tier = "open"
                     entity_label = "Employee number"
 
@@ -332,7 +332,13 @@ def detect_columns(cols: list, rows: int) -> tuple:
                 col_det = "Regex · DOB"; col_tier = "conf"; entity_label = label
 
             elif label == "DATE (employment)":
-                col_det = "Regex · Date"; col_tier = "open"
+                col_det = "Column · Date"; col_tier = "open"
+
+            elif label == "Department":
+                col_det = "Column · Department"; col_tier = "open"
+
+            elif label == "Job title":
+                col_det = "Column · Job Title"; col_tier = "open"
 
             elif label == "Commercial Registration":
                 col_det = "Regex · CR Number"; col_tier = "conf"; entity_label = label

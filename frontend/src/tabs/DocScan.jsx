@@ -68,7 +68,7 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc, onCl
           <div style={{ fontSize: 18, fontWeight: 500, color: "#2C2C2A" }}>Scan results — Client estate</div>
           <span style={{ background: "#EAF3DE", color: "#27500A", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500 }}>Scan complete</span>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <FwToggle fw={fw} setFw={setFw} frameworks={frameworks} />
           <button
             onClick={() => { if (window.confirm("Clear all scanned files?")) onClearAll?.(); }}
@@ -133,22 +133,14 @@ export default function DocScan({ fw, setFw, frameworks, docs, onSelectDoc, onCl
                     {(doc.detectors || []).map((d, i) => <DetTag key={i} t={d} />)}
                   </div>
                 </td>
-                <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0", whiteSpace: "nowrap" }}>
+                <td style={{ padding: "10px 8px", borderBottom: "0.5px solid #e5e4e0" }}>
                   {doc.retention ? (
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#2C2C2A" }}>
-                        {doc.retention.periodYears > 0 ? `${doc.retention.periodYears} yrs` : "None"}
+                      <div style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A", marginBottom: 2, maxWidth: 160 }}>
+                        {doc.retention.recordClass || "—"}
                       </div>
-                      <div style={{
-                        fontSize: 10, fontWeight: 500, marginTop: 3, padding: "1px 6px",
-                        borderRadius: 10, display: "inline-block",
-                        background: doc.retention.status === "overdue" ? "#FCEBEB"
-                          : doc.retention.status === "review_due" ? "#FAEEDA" : "#F1EFE8",
-                        color: doc.retention.status === "overdue" ? "#791F1F"
-                          : doc.retention.status === "review_due" ? "#633806" : "#5F5E5A",
-                      }}>
-                        {doc.retention.status === "overdue" ? "Overdue"
-                          : doc.retention.status === "review_due" ? "Review due" : "Active"}
+                      <div style={{ fontSize: 11, color: "#888" }}>
+                        {doc.retention.periodYears > 0 ? `${doc.retention.periodYears} years` : "No minimum"}
                       </div>
                     </div>
                   ) : <span style={{ color: "#ccc", fontSize: 12 }}>—</span>}
